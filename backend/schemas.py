@@ -27,3 +27,19 @@ class AnalyzeResponse(BaseModel):
     sections: list[SectionOut]
     entities: dict
     persona_notes: list[str] | None = None
+
+
+class VaultRequest(BaseModel):
+    analysis: dict
+
+
+class VaultReceipt(BaseModel):
+    vault_id: str
+    content_hash: str
+    timestamp: str
+    vault_address: str
+    network: str
+    algorithm: str
+    status: str
+    expires: str | None = None
+    message: str

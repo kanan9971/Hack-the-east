@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import httpx
@@ -7,6 +8,13 @@ import config
 from services.parser import Section
 
 logger = logging.getLogger(__name__)
+
+MAX_SECTIONS_FOR_LLM = 12
+MAX_SECTION_BODY_CHARS = 1500
+MAX_PROMPT_CHARS = 10_000
+LLM_MAX_TOKENS = 2048
+
+_cache: dict[str, dict] = {}
 
 SYSTEM_PROMPT = """You are ContractLens, an expert legal document analyst. You receive the text of a legal document that has been split into classified sections.
 
@@ -51,18 +59,30 @@ def _build_user_prompt(sections: list[Section], doc_type: str | None, persona: s
 
     parts.append("\n--- DOCUMENT SECTIONS ---\n")
 
-    for s in sections:
+    total_chars = 0
+    sections_to_use = sections[:MAX_SECTIONS_FOR_LLM]
+
+    for s in sections_to_use:
         label_str = ", ".join(s.labels) if s.labels else "unclassified"
-        parts.append(f"[Section {s.index}: {s.title}] (labels: {label_str})")
-        body = s.body[:3000] if len(s.body) > 3000 else s.body
-        parts.append(body)
-        parts.append("")
+        header = f"[Section {s.index}: {s.title}] (labels: {label_str})"
+        body = s.body[:MAX_SECTION_BODY_CHARS]
+
+        chunk = header + "\n" + body + "\n"
+        if total_chars + len(chunk) > MAX_PROMPT_CHARS:
+            break
+        parts.append(chunk)
+        total_chars += len(chunk)
 
     return "\n".join(parts)
 
 
+def _cache_key(sections: list[Section], doc_type: str | None, persona: str | None) -> str:
+    content = "|".join(f"{s.title}:{s.body[:200]}" for s in sections[:MAX_SECTIONS_FOR_LLM])
+    raw = f"{doc_type}:{persona}:{content}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
 def _repair_truncated_json(text: str) -> str:
-    """Best-effort repair of JSON truncated by max_tokens."""
     in_string = False
     escape = False
     stack: list[str] = []
@@ -131,10 +151,7 @@ def _parse_llm_json(raw: str, truncated: bool = False) -> dict:
 
 
 def _generate_fallback(sections: list[Section], doc_type: str | None, persona: str | None) -> dict:
-    """Heuristic-only fallback when the LLM API is unavailable."""
     titles = [s.title for s in sections]
-    all_text = " ".join(s.body for s in sections)[:500]
-
     summary = (
         f"This {doc_type or 'legal document'} contains {len(sections)} sections "
         f"covering topics such as {', '.join(titles[:4])}. "
@@ -172,6 +189,11 @@ async def analyze_contract(
         logger.warning("No MINIMAX_API_KEY set — using heuristic fallback.")
         return _generate_fallback(sections, doc_type, persona)
 
+    key = _cache_key(sections, doc_type, persona)
+    if key in _cache:
+        logger.info("Cache hit — skipping MiniMax API call.")
+        return _cache[key]
+
     try:
         client = anthropic.AsyncAnthropic(
             api_key=config.MINIMAX_API_KEY,
@@ -180,10 +202,11 @@ async def analyze_contract(
         )
 
         user_prompt = _build_user_prompt(sections, doc_type, persona)
+        logger.info("Prompt size: %d chars (%d sections)", len(user_prompt), min(len(sections), MAX_SECTIONS_FOR_LLM))
 
         message = await client.messages.create(
             model=config.MINIMAX_MODEL,
-            max_tokens=config.MAX_TOKENS,
+            max_tokens=LLM_MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -198,7 +221,14 @@ async def analyze_contract(
             logger.warning("LLM response was truncated (hit max_tokens), attempting repair.")
 
         logger.info("MiniMax API call succeeded, response length: %d", len(raw_text))
-        return _parse_llm_json(raw_text, truncated=truncated)
+        result = _parse_llm_json(raw_text, truncated=truncated)
+
+        _cache[key] = result
+        if len(_cache) > 50:
+            oldest_key = next(iter(_cache))
+            del _cache[oldest_key]
+
+        return result
 
     except anthropic.APIStatusError as e:
         logger.error("MiniMax API error (status %s): %s", e.status_code, e.message)

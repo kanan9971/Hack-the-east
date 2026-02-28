@@ -4,14 +4,16 @@ import SummaryTab from "./components/SummaryTab";
 import RisksTab from "./components/RisksTab";
 import DetailsTab from "./components/DetailsTab";
 import ForYouTab from "./components/ForYouTab";
+import VaultTab from "./components/VaultTab";
 
-type Tab = "summary" | "risks" | "details" | "foryou";
+type Tab = "summary" | "risks" | "details" | "foryou" | "vault";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "summary", label: "Summary" },
   { id: "risks", label: "Risks" },
   { id: "details", label: "Details" },
   { id: "foryou", label: "For You" },
+  { id: "vault", label: "Vault" },
 ];
 
 function LoadingSkeleton() {
@@ -147,6 +149,11 @@ export default function App() {
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
+                {t.id === "vault" && (
+                  <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                )}
                 {t.label}
                 {t.id === "risks" && data.risks.length > 0 && (
                   <span className="ml-1 bg-red-100 text-red-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">
@@ -236,6 +243,7 @@ export default function App() {
             {tab === "foryou" && (
               <ForYouTab data={data} onReanalyze={handleReanalyze} />
             )}
+            {tab === "vault" && <VaultTab data={data} />}
           </>
         )}
       </div>
