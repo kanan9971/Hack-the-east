@@ -1,0 +1,12 @@
+# SAM deploy config (created for non-interactive deploy)
+# Stack name and region can be changed here or overridden via CLI.
+
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "contractlens-api"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "MiniMaxApiKey=PLACEHOLDER BedrockModelId=anthropic.claude-3-haiku-20240307-v1:0"
+confirm_changeset = false
+resolve_s3 = true

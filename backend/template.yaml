@@ -1,11 +1,11 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: ContractLens API — Lambda + API Gateway
+Description: ContractLens API — Lambda + API Gateway (hosted on AWS)
 
 Globals:
   Function:
-    Timeout: 60
-    MemorySize: 256
+    Timeout: 120
+    MemorySize: 512
     Runtime: python3.12
 
 Resources:
@@ -17,8 +17,23 @@ Resources:
       Environment:
         Variables:
           MINIMAX_API_KEY: !Ref MiniMaxApiKey
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/*"
       Events:
-        ApiAny:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+            ApiId: !Ref ContractLensApi
+        ApiProxy:
           Type: HttpApi
           Properties:
             Path: /{proxy+}
@@ -32,7 +47,11 @@ Resources:
         AllowOrigins:
           - "*"
         AllowMethods:
-          - "*"
+          - GET
+          - POST
+          - OPTIONS
+          - PUT
+          - DELETE
         AllowHeaders:
           - "*"
 
@@ -40,9 +59,18 @@ Parameters:
   MiniMaxApiKey:
     Type: String
     NoEcho: true
-    Description: MiniMax API key
+    Description: MiniMax API key for document analysis/insights
+  BedrockModelId:
+    Type: String
+    Default: "anthropic.claude-3-haiku-20240307-v1:0"
+    Description: Bedrock model ID for Student Privacy Agent (e.g. anthropic.claude-3-haiku-20240307-v1:0)
 
 Outputs:
   ApiUrl:
-    Description: API Gateway endpoint URL
+    Description: API base URL — use this in the extension (VITE_API_BASE)
     Value: !Sub "https://${ContractLensApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiUrl"
+  ApiId:
+    Description: API Gateway HTTP API ID
+    Value: !Ref ContractLensApi

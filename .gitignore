@@ -2,6 +2,9 @@
 .env
 backend/.env
 
+# AWS SAM build
+backend/.aws-sam/
+
 # Python
 __pycache__/
 *.pyc

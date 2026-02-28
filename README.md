@@ -36,7 +36,8 @@ python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Set your MiniMax API key
+# Copy .env.example to .env and add your keys (or set env vars)
+# cp .env.example .env   # then edit .env with MINIMAX_API_KEY and optional AWS/Bedrock vars
 export MINIMAX_API_KEY="your-key-here"
 
 # Run the server
@@ -73,15 +74,34 @@ Then load in Chrome:
 
 ## Deploy to AWS
 
+**Prerequisites:** [Install AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html) (e.g. `brew install aws-sam-cli` on macOS) and run `aws configure` with your AWS credentials.
+
+**Deploy the backend:**
+
 ```bash
 cd backend
-
-sam build
-sam deploy --guided \
-  --parameter-overrides MiniMaxApiKey="your-key-here"
+# MINIMAX_API_KEY is read from .env (copy from .env.example if needed)
+./deploy.sh --guided   # first time: sets stack name, region, etc.
+./deploy.sh            # later deploys (no --guided)
 ```
 
-After deploy, update the API base URL in `extension/src/shared/api.ts` and `extension/src/background/index.ts` to the API Gateway URL from the output, then rebuild the extension.
+**Get your API URL** (from deploy output, or):
+
+```bash
+sam list endpoints --stack-name <your-stack-name>
+# or
+aws cloudformation describe-stacks --stack-name <your-stack-name> \
+  --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text
+```
+
+**Build the extension for the hosted API:**
+
+```bash
+cd extension
+VITE_API_BASE=https://YOUR_API_ID.execute-api.YOUR_REGION.amazonaws.com npm run build
+```
+
+Then load `extension/dist` in Chrome as usual. The extension will call your AWS-hosted API.
 
 ## Project Structure
 

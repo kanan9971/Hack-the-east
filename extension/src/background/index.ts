@@ -1,6 +1,8 @@
 import { generateInsights as fetchInsights } from "../shared/api";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE =
+  ((import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE) ||
+  "http://localhost:8000";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 800;
 

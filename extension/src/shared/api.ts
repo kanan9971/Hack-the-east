@@ -8,7 +8,9 @@ import type {
   AgentChatResponse,
 } from "./types";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE =
+  ((import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE) ||
+  "http://localhost:8000";
 
 export const DASHBOARD_URL = `${API_BASE}/dashboard`;
 

@@ -1,0 +1,30 @@
+# Never package secrets or local env
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv
+.venv
+env
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Build / IDE
+.aws-sam
+.git
+.gitignore
+*.md
+!README.md
+
+# Optional: uncomment if you have large dev assets
+# tests
+# *.egg-info
+# .eggs

@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -5,6 +6,8 @@ from mangum import Mangum
 import httpx
 
 import config
+
+logger = logging.getLogger(__name__)
 from schemas import (
     AnalyzeRequest, AnalyzeResponse, AnalyzeUrlRequest, VaultRequest, VaultReceipt,
     InsightsRequest, InsightsResponse, AgentChatRequest, AgentChatResponse,
@@ -33,6 +36,31 @@ app.mount(
     StaticFiles(directory="static", html=True),
     name="dashboard",
 )
+
+
+@app.on_event("startup")
+def startup_config():
+    """Log which API keys are set (never log values)."""
+    minimax_ok = bool(config.MINIMAX_API_KEY and config.MINIMAX_API_KEY.strip())
+    bedrock_configured = bool(config.AWS_REGION and config.BEDROCK_MODEL_ID)
+
+    if minimax_ok:
+        logger.info("MINIMAX_API_KEY is set — document analysis and insights will use the LLM.")
+    else:
+        logger.warning(
+            "MINIMAX_API_KEY is not set — analysis/insights will use heuristic fallbacks. "
+            "Set it in .env for full AI features (see .env.example)."
+        )
+    if bedrock_configured:
+        logger.info(
+            "AWS_REGION and BEDROCK_MODEL_ID are set — Student Privacy Agent will use Bedrock "
+            "(credentials from .env or AWS default chain)."
+        )
+    else:
+        logger.info(
+            "AWS Bedrock not configured — Student Privacy Agent will use built-in fallback replies. "
+            "Optional: set AWS_REGION, BEDROCK_MODEL_ID (and AWS_* if not using IAM) in .env."
+        )
 
 
 @app.get("/health")
