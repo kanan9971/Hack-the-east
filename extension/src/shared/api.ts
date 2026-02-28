@@ -1,4 +1,4 @@
-import type { AnalyzeRequest, AnalyzeResponse } from "./types";
+import type { AnalyzeRequest, AnalyzeResponse, VaultReceipt } from "./types";
 
 const API_BASE = "http://localhost:8000";
 
@@ -14,6 +14,23 @@ export async function analyzeDocument(
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(`API error ${res.status}: ${detail}`);
+  }
+
+  return res.json();
+}
+
+export async function vaultAnalysis(
+  analysis: Record<string, unknown>
+): Promise<VaultReceipt> {
+  const res = await fetch(`${API_BASE}/vault`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ analysis }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Vault error ${res.status}: ${detail}`);
   }
 
   return res.json();

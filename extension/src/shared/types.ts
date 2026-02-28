@@ -31,6 +31,18 @@ export interface AnalyzeRequest {
   persona?: string;
 }
 
+export interface VaultReceipt {
+  vault_id: string;
+  content_hash: string;
+  timestamp: string;
+  vault_address: string;
+  network: string;
+  algorithm: string;
+  status: string;
+  expires: string | null;
+  message: string;
+}
+
 export type MessageType =
   | { type: "ANALYZE_PAGE" }
   | { type: "ANALYZE_TEXT"; text: string; doc_type?: string; persona?: string }

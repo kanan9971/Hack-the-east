@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 import config
-from schemas import AnalyzeRequest, AnalyzeResponse
+from schemas import AnalyzeRequest, AnalyzeResponse, VaultRequest, VaultReceipt
 from services.parser import parse_text
 from services.classifier import classify_sections
 from services.analyzer import analyze_contract
 from services.risk_flagger import flag_risks
+from services.vault import create_vault_receipt
 
 app = FastAPI(title="ContractLens API", version="1.0.0")
 
@@ -46,6 +47,14 @@ async def analyze(req: AnalyzeRequest):
         entities=llm_result.get("entities", {}),
         persona_notes=llm_result.get("persona_notes"),
     )
+
+
+@app.post("/vault", response_model=VaultReceipt)
+async def vault_analysis(req: VaultRequest):
+    if not req.analysis:
+        raise HTTPException(status_code=400, detail="No analysis data provided.")
+    receipt = create_vault_receipt(req.analysis)
+    return VaultReceipt(**receipt)
 
 
 handler = Mangum(app)
