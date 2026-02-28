@@ -1,8 +1,16 @@
-node_modules/
-dist/
+# Environment / secrets
+.env
+backend/.env
+
+# Python
 __pycache__/
 *.pyc
-.env
-.DS_Store
-*.egg-info/
+venv/
 .venv/
+
+# Node
+node_modules/
+extension/dist/
+
+# OS
+.DS_Store

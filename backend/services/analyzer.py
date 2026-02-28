@@ -87,28 +87,70 @@ def _parse_llm_json(raw: str) -> dict:
     }
 
 
+def _generate_fallback(sections: list[Section], doc_type: str | None, persona: str | None) -> dict:
+    """Heuristic-only fallback when the LLM API is unavailable."""
+    titles = [s.title for s in sections]
+    all_text = " ".join(s.body for s in sections)[:500]
+
+    summary = (
+        f"This {doc_type or 'legal document'} contains {len(sections)} sections "
+        f"covering topics such as {', '.join(titles[:4])}. "
+        "Review the risk flags below for clauses that deserve extra attention."
+    )
+
+    key_points = []
+    for s in sections[:7]:
+        snippet = s.body[:120].replace("\n", " ").strip()
+        key_points.append(f"{s.title}: {snippet}...")
+
+    persona_notes = None
+    if persona:
+        persona_notes = [
+            f"As a {persona}, pay close attention to any clauses about data sharing and liability.",
+            f"Check the termination section — make sure you can exit without penalties relevant to a {persona}.",
+            f"Look for auto-renewal terms; set a calendar reminder before the renewal window closes.",
+        ]
+
+    return {
+        "summary": summary,
+        "key_points": key_points,
+        "risks": [],
+        "entities": {"parties": [], "dates": [], "amounts": [], "obligations": []},
+        "persona_notes": persona_notes,
+    }
+
+
 async def analyze_contract(
     sections: list[Section],
     doc_type: str | None = None,
     persona: str | None = None,
 ) -> dict:
-    client = anthropic.Anthropic(
-        api_key=config.MINIMAX_API_KEY,
-        base_url=config.MINIMAX_BASE_URL,
-    )
+    if not config.MINIMAX_API_KEY:
+        logger.warning("No MINIMAX_API_KEY set — using heuristic fallback.")
+        return _generate_fallback(sections, doc_type, persona)
 
-    user_prompt = _build_user_prompt(sections, doc_type, persona)
+    try:
+        client = anthropic.Anthropic(
+            api_key=config.MINIMAX_API_KEY,
+            base_url=config.MINIMAX_BASE_URL,
+        )
 
-    message = client.messages.create(
-        model=config.MINIMAX_MODEL,
-        max_tokens=config.MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+        user_prompt = _build_user_prompt(sections, doc_type, persona)
 
-    raw_text = ""
-    for block in message.content:
-        if hasattr(block, "text"):
-            raw_text += block.text
+        message = client.messages.create(
+            model=config.MINIMAX_MODEL,
+            max_tokens=config.MAX_TOKENS,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
 
-    return _parse_llm_json(raw_text)
+        raw_text = ""
+        for block in message.content:
+            if hasattr(block, "text"):
+                raw_text += block.text
+
+        return _parse_llm_json(raw_text)
+
+    except Exception as e:
+        logger.error("MiniMax API call failed: %s — falling back to heuristic analysis.", e)
+        return _generate_fallback(sections, doc_type, persona)
