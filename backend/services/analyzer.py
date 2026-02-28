@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import anthropic
 
 import config
@@ -154,3 +155,188 @@ async def analyze_contract(
     except Exception as e:
         logger.error("MiniMax API call failed: %s — falling back to heuristic analysis.", e)
         return _generate_fallback(sections, doc_type, persona)
+
+
+def summarize_analysis_for_advisor(
+    llm_result: dict,
+    risks: list[dict],
+    include_sections: bool = False,
+) -> dict:
+    response = {
+        "summary": llm_result.get("summary", ""),
+        "key_points": llm_result.get("key_points", []),
+        "risks": risks,
+        "entities": llm_result.get("entities", {}),
+        "persona_notes": llm_result.get("persona_notes"),
+    }
+    if include_sections:
+        response["sections"] = llm_result.get("sections", [])
+    return response
+
+
+def compare_documents_for_hk(
+    primary_text: str,
+    comparison_text: str,
+    primary_name: str = "Current ToS",
+    comparison_name: str = "Comparison ToS",
+    persona: str | None = None,
+) -> dict:
+    if not primary_text.strip() or not comparison_text.strip():
+        return {
+            "result": "comparison_failed",
+            "reason": "Both primary_text and comparison_text are required.",
+        }
+
+    risk_terms = {
+        "auto_renew": [r"auto.?renew", r"renewal", r"subscription"],
+        "data_sharing": [r"share.*data", r"third.?party", r"sell.*data"],
+        "liability": [r"liability", r"indemnif", r"disclaim"],
+        "termination": [r"terminate", r"suspend", r"without notice"],
+        "fees": [r"fee", r"charge", r"penalt", r"refund"],
+    }
+
+    def _score(text: str) -> tuple[int, dict]:
+        lowered = text.lower()
+        detail = {}
+        score = 0
+        for category, patterns in risk_terms.items():
+            hits = sum(
+                1
+                for p in patterns
+                if re.search(p, lowered, flags=re.IGNORECASE | re.MULTILINE)
+            )
+            detail[category] = hits
+            score += hits
+        return score, detail
+
+    primary_score, primary_detail = _score(primary_text)
+    comparison_score, comparison_detail = _score(comparison_text)
+    better = primary_name if primary_score < comparison_score else comparison_name
+    if primary_score == comparison_score:
+        better = "roughly equal"
+
+    hk_note = (
+        "For Hong Kong users (students/freelancers/fintech consumers), prioritize "
+        "clear data-use limits, cancellation rights, and liability caps."
+    )
+    persona_note = (
+        f"Persona note for {persona}: focus on exit rights and hidden fee language."
+        if persona
+        else None
+    )
+
+    return {
+        "result": "comparison_complete",
+        "winner": better,
+        "summary": (
+            f"{primary_name} score={primary_score}, {comparison_name} score={comparison_score}. "
+            f"Lower is generally safer."
+        ),
+        "primary_breakdown": primary_detail,
+        "comparison_breakdown": comparison_detail,
+        "hk_note": hk_note,
+        "persona_note": persona_note,
+    }
+
+
+def draft_negotiation_email_for_hk(
+    clause_text: str,
+    ask: str,
+    tone: str = "polite",
+    context: str | None = None,
+) -> dict:
+    if not clause_text.strip():
+        return {
+            "result": "draft_failed",
+            "reason": "clause_text is required.",
+        }
+
+    intro = "I hope you are well."
+    if tone.lower() == "firm":
+        intro = "I am writing to request an urgent revision."
+    elif tone.lower() == "friendly":
+        intro = "Thanks for sharing the terms."
+
+    context_line = f"Context: {context}\n\n" if context else ""
+    email = (
+        "Subject: Request to revise a Terms clause\n\n"
+        "Dear Support/Legal Team,\n\n"
+        f"{intro} {context_line}"
+        "I reviewed the Terms and would like to discuss the following clause:\n"
+        f"\"{clause_text.strip()}\"\n\n"
+        f"My request: {ask.strip()}\n\n"
+        "As a Hong Kong user, I would appreciate wording that is clearer on cancellation, "
+        "fees, and personal-data usage in line with reasonable expectations under local privacy principles.\n\n"
+        "Please let me know if we can agree on revised wording.\n\n"
+        "Best regards,\n"
+        "[Your Name]"
+    )
+
+    return {
+        "result": "draft_complete",
+        "tone": tone,
+        "email": email,
+    }
+
+
+def hk_pdpo_compliance_check(text: str, use_case: str | None = None) -> dict:
+    if not text.strip():
+        return {"result": "check_failed", "reason": "text is required."}
+
+    checks = [
+        (
+            "DPP1 Collection",
+            ["purpose", "necessary", "collect"],
+            "State why data is collected and limit to what is necessary.",
+        ),
+        (
+            "DPP2 Accuracy/Retention",
+            ["retain", "retention", "accurate"],
+            "Explain retention period and data accuracy handling.",
+        ),
+        (
+            "DPP3 Use",
+            ["use", "consent", "third party", "marketing"],
+            "Limit secondary use unless prescribed consent is obtained.",
+        ),
+        (
+            "DPP4 Security",
+            ["security", "encrypt", "access control", "breach"],
+            "Include reasonable security safeguards for personal data.",
+        ),
+        (
+            "DPP5 Openness",
+            ["privacy policy", "contact", "access request"],
+            "Provide transparent policy and contact channel for data requests.",
+        ),
+        (
+            "DPP6 Access/Correction",
+            ["access", "correct", "amend", "delete"],
+            "Allow users to access and correct personal data.",
+        ),
+    ]
+
+    lowered = text.lower()
+    findings = []
+    for principle, keywords, guidance in checks:
+        hit = any(k in lowered for k in keywords)
+        findings.append(
+            {
+                "principle": principle,
+                "status": "covered" if hit else "potential_gap",
+                "guidance": guidance,
+            }
+        )
+
+    gaps = [f["principle"] for f in findings if f["status"] == "potential_gap"]
+    return {
+        "result": "check_complete",
+        "use_case": use_case or "general",
+        "framework": "Hong Kong PDPO (DPP1-DPP6) quick screen",
+        "findings": findings,
+        "summary": (
+            "Potential PDPO gaps detected in: " + ", ".join(gaps)
+            if gaps
+            else "No obvious PDPO keyword-level gaps found. Manual legal review still recommended."
+        ),
+    }

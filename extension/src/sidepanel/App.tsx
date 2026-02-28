@@ -4,14 +4,16 @@ import SummaryTab from "./components/SummaryTab";
 import RisksTab from "./components/RisksTab";
 import DetailsTab from "./components/DetailsTab";
 import ForYouTab from "./components/ForYouTab";
+import AdvisorTab from "./components/AdvisorTab";
 
-type Tab = "summary" | "risks" | "details" | "foryou";
+type Tab = "summary" | "risks" | "details" | "foryou" | "advisor";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "summary", label: "Summary" },
   { id: "risks", label: "Risks" },
   { id: "details", label: "Details" },
   { id: "foryou", label: "For You" },
+  { id: "advisor", label: "Ask Advisor" },
 ];
 
 function LoadingSkeleton() {
@@ -39,7 +41,7 @@ function LoadingSkeleton() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("summary");
+  const [tab, setTab] = useState<Tab>("advisor");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [data, setData] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string>("");
@@ -101,6 +103,11 @@ export default function App() {
     });
   };
 
+  const canShowAnalysisTabs = status === "done" && !!data;
+  const visibleTabs = canShowAnalysisTabs
+    ? TABS
+    : TABS.filter((t) => t.id === "advisor");
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -135,28 +142,26 @@ export default function App() {
         </div>
 
         {/* Tab bar */}
-        {status === "done" && data && (
-          <div className="flex px-2">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  tab === t.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {t.label}
-                {t.id === "risks" && data.risks.length > 0 && (
-                  <span className="ml-1 bg-red-100 text-red-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">
-                    {data.risks.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex px-2">
+          {visibleTabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                tab === t.id
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+              {t.id === "risks" && data && data.risks.length > 0 && (
+                <span className="ml-1 bg-red-100 text-red-600 text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                  {data.risks.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Paste panel */}
@@ -180,7 +185,7 @@ export default function App() {
 
       {/* Content area */}
       <div className="p-4">
-        {status === "idle" && (
+        {status === "idle" && tab !== "advisor" && (
           <div className="text-center py-16 px-4">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-blue-100 flex items-center justify-center">
               <svg className="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -200,7 +205,7 @@ export default function App() {
           </div>
         )}
 
-        {status === "loading" && (
+        {status === "loading" && tab !== "advisor" && (
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -210,7 +215,7 @@ export default function App() {
           </div>
         )}
 
-        {status === "error" && (
+        {status === "error" && tab !== "advisor" && (
           <div className="text-center py-12 px-4">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
               <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -228,7 +233,7 @@ export default function App() {
           </div>
         )}
 
-        {status === "done" && data && (
+        {status === "done" && data && tab !== "advisor" && (
           <>
             {tab === "summary" && <SummaryTab data={data} />}
             {tab === "risks" && <RisksTab data={data} />}
@@ -238,6 +243,8 @@ export default function App() {
             )}
           </>
         )}
+
+        {tab === "advisor" && <AdvisorTab data={data} />}
       </div>
     </div>
   );

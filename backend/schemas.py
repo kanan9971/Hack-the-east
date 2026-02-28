@@ -27,3 +27,13 @@ class AnalyzeResponse(BaseModel):
     sections: list[SectionOut]
     entities: dict
     persona_notes: list[str] | None = None
+
+
+class AgentRequest(BaseModel):
+    query: str
+    session_id: str | None = None
+
+
+class AgentResponse(BaseModel):
+    session_id: str
+    response: str

@@ -1,6 +1,6 @@
 # ContractLens — AI Legal Companion (Chrome Extension)
 
-Analyze any Terms of Service, privacy policy, contract, or legal document in your browser. ContractLens provides plain-English summaries, risk flags, clause-by-clause breakdowns, and persona-tailored insights — powered by MiniMax AI.
+Analyze any Terms of Service, privacy policy, contract, or legal document in your browser. ContractLens provides plain-English summaries, risk flags, clause-by-clause breakdowns, and persona-tailored insights.
 
 ## Architecture
 
@@ -15,16 +15,87 @@ Chrome Extension (React + Vite + MV3)
           │
           │  parser → classifier → analyzer → risk flagger
           │
-          └──▶ MiniMax API (MiniMax-M2.1 via Anthropic SDK)
+          ├──▶ MiniMax API (summary + key points on /analyze)
+          └──▶ AWS Bedrock (advisor follow-up Q&A on /agent)
 ```
 
 ## Prerequisites
 
 - **Node.js** >= 18
 - **Python** >= 3.11
-- **MiniMax API key** — sign up at [platform.minimax.io](https://platform.minimax.io) and create a key
+- **MiniMax API key** — used for page summary generation (`/analyze`)
+- **AWS Bedrock access** — used for stronger follow-up advisor chat (`/agent`)
 - **AWS SAM CLI** (for deployment) — [install guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 - **AWS credentials** configured (`aws configure`)
+
+## Setup on a New Computer
+
+Follow these steps from a fresh machine.
+
+### 1. Clone and enter the project
+
+```bash
+git clone https://github.com/kanan9971/Hack-the-east.git
+cd Hack-the-east
+```
+
+### 2. Backend setup
+
+```bash
+cd backend
+py -m pip install -r requirements.txt
+```
+
+Create `backend/.env`:
+
+```env
+MINIMAX_API_KEY=your-real-minimax-key
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+# Optional (if not using default AWS credential chain):
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
+# AWS_SESSION_TOKEN=
+ALLOWED_ORIGINS=*
+ALLOW_CREDENTIALS=false
+```
+
+Run backend:
+
+```bash
+py -m uvicorn main:app --reload --port 8000
+```
+
+Verify backend:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+### 3. Extension setup
+
+Open a second terminal:
+
+```bash
+cd extension
+npm install
+echo "VITE_API_BASE_URL=http://localhost:8000" > .env.production
+npm run build
+```
+
+### 4. Load extension in Chrome
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the `extension/dist` folder
+5. Click **Reload** in `chrome://extensions/` after any new build
+
+### 5. Run it
+
+- Open a Terms/Privacy/contract page
+- Click the ContractLens extension icon
+- Check the side panel for analysis output
 
 ## Quick Start (Local Development)
 

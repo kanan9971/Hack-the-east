@@ -3,7 +3,7 @@
   "name": "ContractLens",
   "version": "1.0.0",
   "description": "AI-powered legal document analyzer — instant summaries, risk flags, and personalized insights for any ToS, privacy policy, or contract.",
-  "permissions": ["activeTab", "sidePanel", "storage"],
+  "permissions": ["activeTab", "sidePanel", "storage", "scripting"],
   "side_panel": {
     "default_path": "src/sidepanel/index.html"
   },

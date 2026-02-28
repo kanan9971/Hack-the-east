@@ -8,6 +8,9 @@ Globals:
     MemorySize: 256
     Runtime: python3.12
 
+Conditions:
+  HasAgentKmsKey: !Not [!Equals [!Ref BedrockAgentCustomerKmsKeyArn, ""]]
+
 Resources:
   ContractLensFunction:
     Type: AWS::Serverless::Function
@@ -17,6 +20,17 @@ Resources:
       Environment:
         Variables:
           MINIMAX_API_KEY: !Ref MiniMaxApiKey
+          BEDROCK_AGENT_ID: !GetAtt ContractLensAdvisorAgent.AgentId
+          BEDROCK_AGENT_ALIAS_ID: !GetAtt ContractLensAdvisorAgentAlias.AgentAliasId
+          AWS_REGION: !Ref AWS::Region
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action:
+              - bedrock:InvokeAgent
+            Resource:
+              - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/${ContractLensAdvisorAgent.AgentId}"
+              - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${ContractLensAdvisorAgent.AgentId}/${ContractLensAdvisorAgentAlias.AgentAliasId}"
       Events:
         ApiAny:
           Type: HttpApi
@@ -24,6 +38,137 @@ Resources:
             Path: /{proxy+}
             Method: ANY
             ApiId: !Ref ContractLensApi
+
+  ContractLensAdvisorAgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - bedrock.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockAgentModelInvokePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockFoundationModelId}"
+
+  ContractLensAdvisorAgent:
+    Type: AWS::Bedrock::Agent
+    Properties:
+      AgentName: contractlens-advisor
+      AutoPrepare: true
+      AgentResourceRoleArn: !GetAtt ContractLensAdvisorAgentRole.Arn
+      FoundationModel: !Ref BedrockFoundationModelId
+      CustomerEncryptionKeyArn: !If [HasAgentKmsKey, !Ref BedrockAgentCustomerKmsKeyArn, !Ref AWS::NoValue]
+      IdleSessionTTLInSeconds: 900
+      Instruction: |
+        You are ContractLens Advisor, an agentic assistant for Hong Kong users reviewing Terms of Service.
+        Always reason through the user question, decide which tool(s) to call, and then provide practical advice.
+
+        Priorities:
+        1) Highlight user risk in plain language, with HK context (students, fintech users, freelancers).
+        2) Use check_hk_pdpo for personal-data compliance questions.
+        3) Use compare_documents when user asks to compare with another platform/provider.
+        4) Use draft_email_template to produce negotiation-ready language.
+        5) Use analyze_document first when document-level understanding is needed.
+
+        Safety and privacy:
+        - Do not ask for unnecessary personal data.
+        - Keep output concise, actionable, and non-definitive legal guidance.
+        - Recommend professional legal counsel for high-stakes decisions.
+      ActionGroups:
+        - ActionGroupName: contractlens-tools
+          Description: ContractLens core workflow tools for ToS advisory.
+          ActionGroupExecutor:
+            CustomControl: RETURN_CONTROL
+          FunctionSchema:
+            Functions:
+              - Name: analyze_document
+                Description: Analyze a legal document and return structured summary and risks.
+                Parameters:
+                  text:
+                    Type: string
+                    Description: Full text of the document to analyze.
+                    Required: true
+                  doc_type:
+                    Type: string
+                    Description: Optional document type hint.
+                    Required: false
+                  persona:
+                    Type: string
+                    Description: Optional user persona (student, freelancer, etc).
+                    Required: false
+              - Name: compare_documents
+                Description: Compare risk posture between two terms/policy documents.
+                Parameters:
+                  primary_text:
+                    Type: string
+                    Description: Main document text.
+                    Required: true
+                  comparison_text:
+                    Type: string
+                    Description: Comparison document text.
+                    Required: true
+                  primary_name:
+                    Type: string
+                    Description: Label for main document.
+                    Required: false
+                  comparison_name:
+                    Type: string
+                    Description: Label for comparison document.
+                    Required: false
+                  persona:
+                    Type: string
+                    Description: Optional user persona.
+                    Required: false
+              - Name: draft_email_template
+                Description: Draft a negotiation email to request term changes.
+                Parameters:
+                  clause_text:
+                    Type: string
+                    Description: The clause text to negotiate.
+                    Required: true
+                  ask:
+                    Type: string
+                    Description: Requested change.
+                    Required: true
+                  tone:
+                    Type: string
+                    Description: polite, friendly, or firm.
+                    Required: false
+                  context:
+                    Type: string
+                    Description: Optional context about user situation.
+                    Required: false
+              - Name: check_hk_pdpo
+                Description: Run a Hong Kong PDPO (DPP1-DPP6) compliance quick check.
+                Parameters:
+                  text:
+                    Type: string
+                    Description: Terms/privacy text to evaluate.
+                    Required: true
+                  use_case:
+                    Type: string
+                    Description: Optional app/business use case context.
+                    Required: false
+
+  ContractLensAdvisorAgentAlias:
+    Type: AWS::Bedrock::AgentAlias
+    Properties:
+      AgentAliasName: prod
+      AgentId: !GetAtt ContractLensAdvisorAgent.AgentId
+      Description: Production alias for ContractLens advisor agent.
 
   ContractLensApi:
     Type: AWS::Serverless::HttpApi
@@ -41,8 +186,22 @@ Parameters:
     Type: String
     NoEcho: true
     Description: MiniMax API key
+  BedrockFoundationModelId:
+    Type: String
+    Default: anthropic.claude-3-5-sonnet-20241022-v2:0
+    Description: Bedrock foundation model ID used by the advisor agent.
+  BedrockAgentCustomerKmsKeyArn:
+    Type: String
+    Default: ""
+    Description: Optional KMS key ARN for Bedrock Agent encryption at rest.
 
 Outputs:
   ApiUrl:
     Description: API Gateway endpoint URL
     Value: !Sub "https://${ContractLensApi}.execute-api.${AWS::Region}.amazonaws.com"
+  BedrockAgentId:
+    Description: ContractLens Bedrock Agent ID
+    Value: !GetAtt ContractLensAdvisorAgent.AgentId
+  BedrockAgentAliasId:
+    Description: ContractLens Bedrock Agent Alias ID
+    Value: !GetAtt ContractLensAdvisorAgentAlias.AgentAliasId

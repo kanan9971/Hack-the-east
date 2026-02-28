@@ -22,19 +22,44 @@ function extractPageText(): string {
   const body = document.body;
   if (!body) return "";
 
-  const selectors =
-    "nav, header, footer, .nav, .header, .footer, .sidebar, .menu, .cookie-banner, .ad, [role='navigation'], [role='banner']";
-  const clone = body.cloneNode(true) as HTMLElement;
+  const extractionTargets = [
+    "main",
+    "article",
+    "[role='main']",
+    "[data-testid*='legal']",
+    "[class*='legal']",
+    "[class*='terms']",
+    "[class*='policy']",
+    "[id*='legal']",
+    "[id*='terms']",
+    "[id*='policy']",
+  ];
 
-  clone.querySelectorAll(selectors).forEach((el) => el.remove());
-  clone.querySelectorAll("script, style, noscript, iframe").forEach((el) =>
-    el.remove()
-  );
+  const selectorsToRemove =
+    "nav, header, footer, .nav, .header, .footer, .sidebar, .menu, .cookie-banner, .ad, [role='navigation'], [role='banner'], [aria-hidden='true'], [hidden]";
 
-  let text = clone.innerText || clone.textContent || "";
-  text = text.replace(/\n{3,}/g, "\n\n").trim();
+  const candidateRoots: HTMLElement[] = [];
+  for (const s of extractionTargets) {
+    document.querySelectorAll(s).forEach((el) => {
+      if (el instanceof HTMLElement) candidateRoots.push(el);
+    });
+  }
+  candidateRoots.push(body);
 
-  return text;
+  let best = "";
+  for (const root of candidateRoots) {
+    const clone = root.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll(selectorsToRemove).forEach((el) => el.remove());
+    clone.querySelectorAll("script, style, noscript, iframe, svg").forEach((el) =>
+      el.remove()
+    );
+
+    let text = clone.innerText || clone.textContent || "";
+    text = text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
+    if (text.length > best.length) best = text;
+  }
+
+  return best;
 }
 
 function detectDocType(): string | undefined {
@@ -52,9 +77,21 @@ function detectDocType(): string | undefined {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "ANALYZE_PAGE") {
-    const text = extractPageText();
-    const doc_type = detectDocType();
-    sendResponse({ type: "PAGE_TEXT", text, doc_type });
+    const collect = () => {
+      const text = extractPageText();
+      const doc_type = detectDocType();
+      sendResponse({ type: "PAGE_TEXT", text, doc_type });
+    };
+
+    // Some sites (including legal pages with heavy hydration) finish rendering late.
+    const initial = extractPageText();
+    if (initial.length >= 200) {
+      const doc_type = detectDocType();
+      sendResponse({ type: "PAGE_TEXT", text: initial, doc_type });
+      return true;
+    }
+
+    window.setTimeout(collect, 1200);
   }
   return true;
 });

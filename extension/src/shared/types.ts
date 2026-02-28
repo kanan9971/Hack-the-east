@@ -31,6 +31,16 @@ export interface AnalyzeRequest {
   persona?: string;
 }
 
+export interface AgentRequest {
+  query: string;
+  session_id?: string;
+}
+
+export interface AgentResponse {
+  session_id: string;
+  response: string;
+}
+
 export type MessageType =
   | { type: "ANALYZE_PAGE" }
   | { type: "ANALYZE_TEXT"; text: string; doc_type?: string; persona?: string }
