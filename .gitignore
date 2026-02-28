@@ -10,7 +10,6 @@ venv/
 
 # Node
 node_modules/
-extension/dist/
 
 # OS
 .DS_Store
