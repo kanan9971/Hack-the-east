@@ -1,3 +1,5 @@
+import { generateInsights as fetchInsights } from "../shared/api";
+
 const API_BASE = "http://localhost:8000";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 800;
@@ -96,6 +98,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       runAnalysis(text, message.doc_type, message.persona);
     }
     sendResponse({ ok: true });
+    return true;
+  }
+
+  if (message.type === "GENERATE_INSIGHTS") {
+    (async () => {
+      try {
+        const res = await fetchInsights({
+          analysis: message.analysis,
+          user_context: message.user_context,
+        });
+        chrome.runtime.sendMessage({
+          type: "INSIGHTS_UPDATE",
+          insights: res.insights,
+        }).catch(() => {});
+        sendResponse({ ok: true, insights: res.insights });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        chrome.runtime.sendMessage({
+          type: "INSIGHTS_UPDATE",
+          insights: null,
+          error: msg,
+        }).catch(() => {});
+        sendResponse({ ok: false, error: msg });
+      }
+    })();
     return true;
   }
 

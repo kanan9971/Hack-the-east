@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 import config
-from schemas import AnalyzeRequest, AnalyzeResponse, VaultRequest, VaultReceipt
+from schemas import AnalyzeRequest, AnalyzeResponse, VaultRequest, VaultReceipt, InsightsRequest, InsightsResponse
 from services.parser import parse_text
 from services.classifier import classify_sections
 from services.analyzer import analyze_contract
+from services.insights import generate_insights
 from services.risk_flagger import flag_risks
 from services.vault import create_vault_receipt
 
@@ -49,6 +50,10 @@ async def analyze(req: AnalyzeRequest):
     )
 
 
+@app.post("/insights", response_model=InsightsResponse)
+async def get_insights(req: InsightsRequest):
+    insights = await generate_insights(req.analysis, req.user_context)
+    return InsightsResponse(insights=insights)
 @app.post("/vault", response_model=VaultReceipt)
 async def vault_analysis(req: VaultRequest):
     if not req.analysis:
