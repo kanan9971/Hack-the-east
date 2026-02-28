@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ContractLens</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f0f4f0;
+        color: #111827;
+      }
+
+      /* Header - compact, QuillBot-style */
+      .header {
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      }
+      .header-inner {
+        padding: 10px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .logo-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .logo-box {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #3b82f6;
+        color: #fff;
+        font-weight: 700;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .logo-title { font-size: 18px; font-weight: 600; color: #111827; margin: 0; }
+
+      /* Tab bar - only when done, inside right column */
+      .tab-bar {
+        display: flex;
+        padding: 0 12px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #fff;
+      }
+      .tab-btn {
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+        background: transparent;
+        color: #6b7280;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      .tab-btn:hover { color: #374151; }
+      .tab-btn.active { color: #2563eb; border-bottom-color: #3b82f6; }
+      .tab-badge {
+        margin-left: 4px;
+        background: #fee2e2;
+        color: #dc2626;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+
+      /* Half-and-half layout (QuillBot-style) */
+      .layout { display: flex; min-height: calc(100vh - 52px); }
+      .left-col {
+        flex: 1;
+        min-width: 0;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: #f8faf8;
+        border-right: 1px solid #e5e7eb;
+      }
+      .left-pane {
+        flex: 1;
+        min-height: 280px;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        overflow: hidden;
+      }
+      .left-pane .pane-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .left-col .field-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+        margin: 0;
+      }
+      .left-col .url-input {
+        flex: 1;
+        min-width: 120px;
+        padding: 8px 12px;
+        font-size: 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        height: 38px;
+      }
+      .left-col .url-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+      .left-col .paste-textarea {
+        width: 100%;
+        flex: 1;
+        min-height: 200px;
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        border: none;
+        resize: none;
+        font-family: inherit;
+      }
+      .left-col .paste-textarea::placeholder { color: #9ca3af; }
+      .left-col .paste-textarea:focus { outline: none; }
+      .left-pane .pane-footer {
+        padding: 8px 16px;
+        border-top: 1px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      .left-col .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .left-col .row input {
+        flex: 1;
+        min-width: 100px;
+        padding: 8px 12px;
+        font-size: 13px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+      }
+      .left-col .row input:focus { outline: none; border-color: #3b82f6; }
+      .left-col .analyze-btn {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 15px;
+        font-weight: 600;
+        background: #3b82f6;
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.25);
+      }
+      .left-col .analyze-btn:hover { background: #2563eb; box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3); }
+      .left-col .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+      .right-col {
+        flex: 1;
+        min-width: 0;
+        overflow: auto;
+        background: #f8faf8;
+        display: flex;
+        flex-direction: column;
+      }
+      .right-col .output-pane {
+        flex: 1;
+        background: #fff;
+        margin: 24px;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        overflow: auto;
+      }
+
+      /* Content (right column, inside output pane) */
+      .content { padding: 20px; min-height: 100%; }
+
+      /* Idle state */
+      .idle-state {
+        text-align: center;
+        padding: 64px 16px;
+      }
+      .idle-icon-wrap {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        border-radius: 16px;
+        background: #dbeafe;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .idle-icon-wrap svg { width: 32px; height: 32px; color: #3b82f6; }
+      .idle-state h2 { font-size: 18px; font-weight: 600; color: #1f2937; margin: 0 0 8px; }
+      .idle-state p { font-size: 14px; color: #6b7280; max-width: 280px; margin: 0 auto 16px; }
+      .idle-state .link-btn {
+        font-size: 14px; font-weight: 500; color: #3b82f6; background: none; border: none; cursor: pointer;
+      }
+      .idle-state .link-btn:hover { color: #2563eb; text-decoration: underline; }
+
+      /* Loading */
+      .loading-state { margin-bottom: 16px; }
+      .loading-state .spinner-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .spinner {
+        width: 16px; height: 16px;
+        border: 2px solid #3b82f6;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .skeleton {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border: 1px solid #f3f4f6;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .skeleton-line { height: 12px; background: #e5e7eb; border-radius: 4px; margin-bottom: 8px; }
+      .skeleton-line.short { width: 33%; }
+      .skeleton-line.medium { width: 80%; }
+      .skeleton-line.long { width: 60%; }
+
+      /* Error state */
+      .error-state { text-align: center; padding: 48px 16px; }
+      .error-icon-wrap {
+        width: 48px; height: 48px;
+        margin: 0 auto 12px;
+        border-radius: 50%;
+        background: #fee2e2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .error-icon-wrap svg { width: 24px; height: 24px; color: #ef4444; }
+      .error-state h2 { font-size: 16px; font-weight: 600; color: #1f2937; margin: 0 0 8px; }
+      .error-state p { font-size: 14px; color: #6b7280; margin: 0 0 12px; }
+
+      /* Cards - Summary, etc. */
+      .card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border: 1px solid #f3f4f6;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .card-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+      }
+      .card-title.mb3 { margin-bottom: 12px; }
+      .card p, .card .text-gray-800 { color: #1f2937; line-height: 1.5; }
+      .key-points { list-style: none; padding: 0; margin: 0; }
+      .key-points li {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #374151;
+      }
+      .key-points .dot { width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; margin-top: 6px; }
+      .entities-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 14px; }
+      .entities-grid .label { font-weight: 500; color: #6b7280; }
+      .entities-grid .val { color: #1f2937; }
+
+      /* Risks */
+      .risks-summary { display: flex; gap: 12px; font-size: 14px; margin-bottom: 12px; padding: 0 4px; }
+      .risks-summary span { display: flex; align-items: center; gap: 4px; font-weight: 500; }
+      .risks-summary .high { color: #dc2626; }
+      .risks-summary .medium { color: #d97706; }
+      .risks-summary .low { color: #16a34a; }
+      .risk-card {
+        border-radius: 12px;
+        border: 1px solid #f3f4f6;
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+      .risk-card.high-bg { background: #fef2f2; }
+      .risk-card.medium-bg { background: #fffbeb; }
+      .risk-card.low-bg { background: #f0fdf4; }
+      .risk-card-btn {
+        width: 100%;
+        text-align: left;
+        padding: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+      }
+      .risk-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+      .risk-dot.high { background: #ef4444; }
+      .risk-dot.medium { background: #f59e0b; }
+      .risk-dot.low { background: #22c55e; }
+      .risk-meta { font-size: 11px; margin-bottom: 4px; }
+      .risk-meta .sev { font-weight: 600; text-transform: uppercase; }
+      .risk-meta .high { color: #b91c1c; }
+      .risk-meta .medium { color: #b45309; }
+      .risk-meta .low { color: #15803d; }
+      .risk-meta .cat { color: #6b7280; margin-left: 8px; text-transform: capitalize; }
+      .risk-excerpt-box {
+        padding: 12px 16px 16px 48px;
+        font-size: 12px;
+        color: #4b5563;
+        font-style: italic;
+        background: rgba(255,255,255,0.6);
+        border: 1px solid rgba(229,231,235,0.5);
+        border-radius: 8px;
+        margin: 0 16px 16px 48px;
+      }
+      .no-risks { text-align: center; padding: 48px 16px; color: #6b7280; }
+      .no-risks .title { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+
+      /* Details (sections) */
+      .section-accordion {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border: 1px solid #f3f4f6;
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+      .section-accordion-btn {
+        width: 100%;
+        text-align: left;
+        padding: 16px;
+        border: none;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+      }
+      .section-accordion-btn span { font-weight: 500; font-size: 14px; color: #1f2937; }
+      .section-labels { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .section-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .section-body { padding: 0 16px 16px; font-size: 14px; color: #6b7280; white-space: pre-wrap; line-height: 1.5; }
+      .label-default { background: #f3f4f6; color: #6b7280; }
+      .label-data_use { background: #f3e8ff; color: #7c3aed; }
+      .label-data_sharing { background: #fee2e2; color: #dc2626; }
+      .label-ip_assignment { background: #ffedd5; color: #ea580c; }
+      .label-dispute_resolution { background: #ffe4e6; color: #e11d48; }
+      .label-auto_renew { background: #fef3c7; color: #d97706; }
+      .label-termination { background: #fef9c3; color: #ca8a04; }
+      .label-liability { background: #fce7f3; color: #db2777; }
+      .label-non_compete { background: #e0e7ff; color: #4f46e5; }
+      .label-fees { background: #d1fae5; color: #059669; }
+      .label-confidentiality { background: #cffafe; color: #0891b2; }
+
+      /* For You */
+      .persona-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      .persona-btn {
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 999px;
+        border: none;
+        background: #f3f4f6;
+        color: #374151;
+        cursor: pointer;
+      }
+      .persona-btn:hover { background: #e5e7eb; }
+      .persona-btn.active { background: #3b82f6; color: #fff; }
+      .persona-notes { list-style: none; padding: 0; margin: 0; }
+      .persona-notes li {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.5;
+      }
+      .persona-notes .icon { color: #3b82f6; flex-shrink: 0; margin-top: 2px; }
+      .for-you-empty { text-align: center; padding: 32px 16px; color: #9ca3af; font-size: 14px; }
+
+      /* Vault */
+      .vault-info {
+        background: linear-gradient(135deg, #f5f3ff, #e0e7ff);
+        border: 1px solid #c7d2fe;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .vault-info h2 { font-size: 12px; font-weight: 700; color: #3730a3; margin: 0 0 4px; }
+      .vault-info .sub { font-size: 11px; color: #6366f1; margin-bottom: 8px; }
+      .vault-info p { font-size: 14px; color: #4338ca; line-height: 1.5; margin: 0; }
+      .vault-list { margin-bottom: 16px; }
+      .vault-list ul { list-style: none; padding: 0; margin: 0; }
+      .vault-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: #374151; margin-bottom: 8px; }
+      .vault-list .lock { color: #7c3aed; flex-shrink: 0; }
+      .vault-btn {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(90deg, #7c3aed, #4f46e5);
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .vault-btn:hover { opacity: 0.95; }
+      .vault-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+      .vault-error { padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; font-size: 14px; color: #b91c1c; margin-top: 12px; }
+      .vault-receipt {
+        background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+        border: 1px solid #a7f3d0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .vault-receipt h2 { font-size: 12px; font-weight: 700; color: #065f46; margin: 0 0 4px; }
+      .vault-receipt .sub { font-size: 11px; color: #047857; margin-bottom: 8px; }
+      .vault-receipt p { font-size: 14px; color: #065f46; margin: 0; }
+      .receipt-details { background: #fff; border-radius: 12px; border: 1px solid #f3f4f6; padding: 20px; margin-bottom: 16px; }
+      .receipt-row { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; font-size: 14px; }
+      .receipt-row .l { font-size: 11px; font-weight: 500; color: #9ca3af; text-transform: uppercase; }
+      .receipt-row .r { color: #1f2937; word-break: break-all; font-family: ui-monospace, monospace; }
+      .vault-another-btn { width: 100%; padding: 10px; font-size: 14px; font-weight: 500; color: #6b7280; background: #f3f4f6; border: none; border-radius: 12px; cursor: pointer; }
+      .vault-another-btn:hover { background: #e5e7eb; }
+      .hidden { display: none !important; }
+
+      @media (max-width: 900px) {
+        .layout { flex-direction: column; }
+        .left-col { min-height: 320px; }
+        .right-col .output-pane { margin: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-inner">
+        <div class="logo-wrap">
+          <div class="logo-box">CL</div>
+          <h1 class="logo-title">ContractLens</h1>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside class="left-col">
+        <div class="left-pane">
+          <div class="pane-header">
+            <span class="field-label">Add a link</span>
+            <input type="text" id="url-input" class="url-input" placeholder="https://example.com/terms" />
+          </div>
+          <textarea id="text-input" class="paste-textarea" placeholder="Paste contract or legal text here..."></textarea>
+          <div class="pane-footer">
+            <span id="word-count">0 words</span>
+            <span>Min 50 characters or use a link</span>
+          </div>
+        </div>
+        <div class="row">
+          <input type="text" id="doc-type" placeholder="Document type (optional)" />
+          <input type="text" id="persona-input" placeholder="Persona (optional)" />
+        </div>
+        <button type="button" class="analyze-btn" id="analyze-btn">Analyze</button>
+      </aside>
+      <div class="right-col">
+        <div class="tab-bar hidden" id="tab-bar">
+          <button type="button" class="tab-btn active" data-tab="summary">Summary</button>
+          <button type="button" class="tab-btn" data-tab="risks">Risks</button>
+          <button type="button" class="tab-btn" data-tab="details">Details</button>
+          <button type="button" class="tab-btn" data-tab="foryou">For You</button>
+          <button type="button" class="tab-btn" data-tab="vault">
+            <svg width="14" height="14" style="vertical-align: -2px; margin-right: 2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            Vault
+          </button>
+        </div>
+        <div class="output-pane">
+    <div class="content">
+      <div id="idle-state" class="idle-state">
+        <div class="idle-icon-wrap">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <h2>No document analyzed yet</h2>
+        <p>Add a link or paste text in the left column, then click Analyze.</p>
+      </div>
+
+      <div id="loading-state" class="loading-state hidden">
+        <div class="spinner-row">
+          <div class="spinner"></div>
+          <span>Analyzing document...</span>
+        </div>
+        <div class="skeleton"><div class="skeleton-line short"></div><div class="skeleton-line"></div><div class="skeleton-line medium"></div><div class="skeleton-line long"></div></div>
+        <div class="skeleton"><div class="skeleton-line short"></div><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line medium"></div></div>
+        <div class="skeleton"><div class="skeleton-line short"></div><div class="skeleton-line medium"></div><div class="skeleton-line long"></div></div>
+      </div>
+
+      <div id="error-state" class="error-state hidden">
+        <div class="error-icon-wrap">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+        <h2>Analysis failed</h2>
+        <p id="error-message"></p>
+      </div>
+
+      <div id="done-content" class="hidden">
+        <div id="tab-summary"></div>
+        <div id="tab-risks" class="hidden"></div>
+        <div id="tab-details" class="hidden"></div>
+        <div id="tab-foryou" class="hidden"></div>
+        <div id="tab-vault" class="hidden"></div>
+      </div>
+    </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = window.location.origin;
+      const state = { status: 'idle', data: null, error: '', vaultReceipt: null };
+
+      const tabBar = document.getElementById('tab-bar');
+      const idleState = document.getElementById('idle-state');
+      const loadingState = document.getElementById('loading-state');
+      const errorState = document.getElementById('error-state');
+      const doneContent = document.getElementById('done-content');
+      const errorMessage = document.getElementById('error-message');
+      const textInput = document.getElementById('text-input');
+      const urlInput = document.getElementById('url-input');
+      const analyzeBtn = document.getElementById('analyze-btn');
+
+      function setStatus(s) {
+        state.status = s;
+        idleState.classList.toggle('hidden', s !== 'idle');
+        loadingState.classList.toggle('hidden', s !== 'loading');
+        errorState.classList.toggle('hidden', s !== 'error');
+        doneContent.classList.toggle('hidden', s !== 'done');
+        tabBar.classList.toggle('hidden', s !== 'done' || !state.data);
+        if (s === 'error') errorMessage.textContent = state.error;
+      }
+
+      function setTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => { b.classList.toggle('active', b.dataset.tab === tabId); });
+        ['summary','risks','details','foryou','vault'].forEach(id => {
+          document.getElementById('tab-' + id).classList.toggle('hidden', id !== tabId);
+        });
+        if (tabId === 'vault') renderVault();
+      }
+
+      function renderSummary() {
+        const d = state.data;
+        const root = document.getElementById('tab-summary');
+        root.innerHTML = '';
+        const card = (title, body) => {
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.innerHTML = '<div class="card-title">' + title + '</div>' + body;
+          root.appendChild(el);
+        };
+        card('Summary', '<p class="text-gray-800">' + (d.summary || '') + '</p>');
+        if (d.key_points && d.key_points.length) {
+          card('Key Points', '<ul class="key-points">' + d.key_points.map(p => '<li><span class="dot"></span><span>' + escapeHtml(p) + '</span></li>').join('') + '</ul>');
+        }
+        if (d.entities && (d.entities.parties?.length || d.entities.dates?.length || d.entities.amounts?.length)) {
+          let grid = '';
+          if (d.entities.parties?.length) grid += '<div><span class="label">Parties</span><p class="val">' + escapeHtml(d.entities.parties.join(', ')) + '</p></div>';
+          if (d.entities.dates?.length) grid += '<div><span class="label">Dates</span><p class="val">' + escapeHtml(d.entities.dates.join(', ')) + '</p></div>';
+          if (d.entities.amounts?.length) grid += '<div><span class="label">Amounts</span><p class="val">' + escapeHtml(d.entities.amounts.join(', ')) + '</p></div>';
+          card('Entities', '<div class="entities-grid">' + grid + '</div>');
+        }
+      }
+
+      function renderRisks() {
+        const d = state.data;
+        const root = document.getElementById('tab-risks');
+        root.innerHTML = '';
+        if (!d.risks || !d.risks.length) {
+          root.innerHTML = '<div class="no-risks"><p class="title">No significant risks detected</p><p>This document appears relatively standard.</p></div>';
+          return;
+        }
+        const high = d.risks.filter(r => r.severity === 'high');
+        const medium = d.risks.filter(r => r.severity === 'medium');
+        const low = d.risks.filter(r => r.severity === 'low');
+        let summary = '<div class="risks-summary">';
+        if (high.length) summary += '<span class="high"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:#ef4444"></span>' + high.length + ' High</span>';
+        if (medium.length) summary += '<span class="medium"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span>' + medium.length + ' Medium</span>';
+        if (low.length) summary += '<span class="low"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:#22c55e"></span>' + low.length + ' Low</span>';
+        summary += '</div>';
+        root.innerHTML = summary;
+        d.risks.forEach((r, i) => {
+          const card = document.createElement('div');
+          card.className = 'risk-card ' + (r.severity === 'high' ? 'high-bg' : r.severity === 'medium' ? 'medium-bg' : 'low-bg');
+          const excerptHtml = r.clause_excerpt ? '<div class="risk-excerpt-box hidden" data-excerpt>' + escapeHtml(r.clause_excerpt) + '</div>' : '';
+          card.innerHTML = '<button type="button" class="risk-card-btn" data-i="' + i + '">' +
+            '<span class="risk-dot ' + r.severity + '"></span>' +
+            '<div><div class="risk-meta"><span class="sev ' + r.severity + '">' + r.severity + '</span><span class="cat">' + (r.category || '').replace(/_/g, ' ') + '</span></div><p class="text-gray-800" style="font-size:14px;margin:0">' + escapeHtml(r.explanation || '') + '</p></div>' +
+            '<svg width="16" height="16" class="chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M19 9l-7 7-7-7"/></svg>' +
+            '</button>' + excerptHtml;
+          root.appendChild(card);
+          const btn = card.querySelector('button');
+          const excerptEl = card.querySelector('[data-excerpt]');
+          btn.addEventListener('click', () => {
+            if (excerptEl) { excerptEl.classList.toggle('hidden'); btn.querySelector('.chevron').style.transform = excerptEl.classList.contains('hidden') ? '' : 'rotate(180deg)'; }
+          });
+        });
+      }
+
+      function renderDetails() {
+        const d = state.data;
+        const root = document.getElementById('tab-details');
+        root.innerHTML = '';
+        (d.sections || []).forEach((sec, i) => {
+          const labels = (sec.labels || []).map(l => '<span class="section-label label-' + l + '">' + l.replace(/_/g, ' ') + '</span>').join('');
+          const acc = document.createElement('div');
+          acc.className = 'section-accordion';
+          acc.innerHTML = '<button type="button" class="section-accordion-btn"><span>' + escapeHtml(sec.title || 'Section') + '</span><svg width="16" height="16" class="chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>' +
+            (labels ? '<div class="section-labels" style="padding:0 16px 8px">' + labels + '</div>' : '') +
+            '<div class="section-body hidden">' + escapeHtml(sec.body || '') + '</div>';
+          root.appendChild(acc);
+          const bodyEl = acc.querySelector('.section-body');
+          const chevron = acc.querySelector('.chevron');
+          acc.querySelector('button').addEventListener('click', () => {
+            bodyEl.classList.toggle('hidden');
+            chevron.style.transform = bodyEl.classList.contains('hidden') ? '' : 'rotate(180deg)';
+          });
+        });
+      }
+
+      function renderForYou() {
+        const d = state.data;
+        const root = document.getElementById('tab-foryou');
+        const PERSONAS = [{ id: 'student', label: 'Student' }, { id: 'employee', label: 'Employee' }, { id: 'freelancer', label: 'Freelancer' }, { id: 'tenant', label: 'Tenant' }];
+        let html = '<div class="card"><div class="card-title mb3">I am a...</div><div class="persona-btns">';
+        PERSONAS.forEach(p => { html += '<button type="button" class="persona-btn" data-persona="' + p.id + '">' + p.label + '</button>'; });
+        html += '</div></div>';
+        if (d.persona_notes && d.persona_notes.length) {
+          html += '<div class="card"><div class="card-title mb3">What this means for you</div><ul class="persona-notes">';
+          d.persona_notes.forEach(n => {
+            html += '<li><svg class="icon" width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg><span>' + escapeHtml(n) + '</span></li>';
+          });
+          html += '</ul></div>';
+        } else {
+          html += '<div class="for-you-empty">Select a persona above to get tailored insights.</div>';
+        }
+        root.innerHTML = html;
+      }
+
+      function renderVault() {
+        const root = document.getElementById('tab-vault');
+        if (state.vaultReceipt) {
+          const r = state.vaultReceipt;
+          root.innerHTML = '<div class="vault-receipt"><h2>Quantum Vault Sealed</h2><p class="sub">Protected by post-quantum lattice encryption</p><p>' + escapeHtml(r.message || '') + '</p></div>' +
+            '<div class="receipt-details"><div class="card-title mb3">Vault Receipt</div>' +
+            '<div class="receipt-row"><span class="l">Vault ID</span><span class="r">' + escapeHtml(r.vault_id || '') + '</span></div>' +
+            '<div class="receipt-row"><span class="l">Content Hash</span><span class="r">' + escapeHtml((r.content_hash || '').slice(0,10) + '...' + (r.content_hash || '').slice(-10)) + '</span></div>' +
+            '<div class="receipt-row"><span class="l">Sealed At</span><span class="r">' + (r.timestamp ? new Date(r.timestamp).toLocaleString() : '') + '</span></div>' +
+            '</div><button type="button" class="vault-another-btn" id="vault-another">Vault Another Analysis</button>';
+          root.querySelector('#vault-another').onclick = () => { state.vaultReceipt = null; renderVault(); };
+          return;
+        }
+        root.innerHTML = '<div class="vault-info"><h2>Abelian Privacy Vault</h2><p class="sub">Quantum-Resistant Document Protection</p><p>Seal your contract analysis with post-quantum lattice-based encryption. Your data stays private.</p></div>' +
+          '<div class="card vault-list"><div class="card-title mb3">What Gets Vaulted</div><ul><li><span class="lock">🔒</span>Contract summary & key points</li><li><span class="lock">🔒</span>Risk flags & clause excerpts</li><li><span class="lock">🔒</span>Extracted entities</li></ul></div>' +
+          '<button type="button" class="vault-btn" id="vault-btn">Lock to Quantum Vault</button><div id="vault-error" class="vault-error hidden"></div>';
+        const vaultBtn = root.querySelector('#vault-btn');
+        const vaultErr = root.querySelector('#vault-error');
+        vaultBtn.onclick = async () => {
+          vaultBtn.disabled = true;
+          vaultBtn.innerHTML = '<div class="spinner" style="border-color:#fff;border-top-color:transparent"></div> Sealing to Quantum Vault...';
+          vaultErr.classList.add('hidden');
+          try {
+            const res = await fetch(API_BASE + '/vault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ analysis: { summary: state.data.summary, key_points: state.data.key_points, risks: state.data.risks, entities: state.data.entities } }) });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Vault failed');
+            state.vaultReceipt = data;
+            renderVault();
+          } catch (e) {
+            vaultErr.textContent = e.message || 'Failed to vault';
+            vaultErr.classList.remove('hidden');
+          }
+          vaultBtn.disabled = false;
+          vaultBtn.innerHTML = '🔒 Lock to Quantum Vault';
+        };
+      }
+
+      function escapeHtml(s) {
+        if (s == null) return '';
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      function updateRisksBadge() {
+        const risksTab = document.querySelector('.tab-btn[data-tab="risks"]');
+        if (!risksTab) return;
+        const count = state.data?.risks?.length || 0;
+        let badge = risksTab.querySelector('.tab-badge');
+        if (count > 0) {
+          if (!badge) { badge = document.createElement('span'); badge.className = 'tab-badge'; risksTab.appendChild(badge); }
+          badge.textContent = count;
+        } else if (badge) badge.remove();
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+      textInput.addEventListener('input', () => {
+        const w = textInput.value.trim().split(/\s+/).filter(Boolean).length;
+        const el = document.getElementById('word-count');
+        if (el) el.textContent = w + ' word' + (w !== 1 ? 's' : '');
+      });
+
+      analyzeBtn.onclick = async () => {
+        const persona = document.getElementById('persona-input').value.trim() || null;
+        const docType = document.getElementById('doc-type').value.trim() || null;
+        const u = urlInput.value.trim();
+        const text = textInput.value.trim();
+        let apiUrl, body;
+        if (u) {
+          apiUrl = API_BASE + '/analyze_url';
+          body = { url: u, doc_type: docType || null, persona };
+        } else if (text.length >= 50) {
+          apiUrl = API_BASE + '/analyze';
+          body = { text, doc_type: docType || null, persona };
+        } else {
+          setStatus('error');
+          state.error = 'Add a link or paste at least 50 characters of text.';
+          return;
+        }
+        setStatus('loading');
+        state.error = '';
+        try {
+          const res = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || res.status));
+          state.data = data;
+          state.vaultReceipt = null;
+          setStatus('done');
+          renderSummary();
+          renderRisks();
+          renderDetails();
+          renderForYou();
+          updateRisksBadge();
+          setTab('summary');
+        } catch (e) {
+          state.error = e.message;
+          setStatus('error');
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -7,6 +7,12 @@ class AnalyzeRequest(BaseModel):
     persona: str | None = None
 
 
+class AnalyzeUrlRequest(BaseModel):
+    url: str
+    doc_type: str | None = None
+    persona: str | None = None
+
+
 class RiskFlag(BaseModel):
     category: str
     severity: str
@@ -51,6 +57,8 @@ class InsightsRequest(BaseModel):
 
 class InsightsResponse(BaseModel):
     insights: ForYouInsights
+
+
 class VaultRequest(BaseModel):
     analysis: dict
 
