@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: ContractLens API — Lambda + API Gateway
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 256
+    Runtime: python3.12
+
+Resources:
+  ContractLensFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main.handler
+      CodeUri: .
+      Environment:
+        Variables:
+          MINIMAX_API_KEY: !Ref MiniMaxApiKey
+      Events:
+        ApiAny:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            ApiId: !Ref ContractLensApi
+
+  ContractLensApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - "*"
+        AllowHeaders:
+          - "*"
+
+Parameters:
+  MiniMaxApiKey:
+    Type: String
+    NoEcho: true
+    Description: MiniMax API key
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ContractLensApi}.execute-api.${AWS::Region}.amazonaws.com"

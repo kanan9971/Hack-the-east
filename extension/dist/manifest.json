@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "ContractLens",
+  "version": "1.0.0",
+  "description": "AI-powered legal document analyzer — instant summaries, risk flags, and personalized insights for any ToS, privacy policy, or contract.",
+  "permissions": ["activeTab", "sidePanel", "storage"],
+  "side_panel": {
+    "default_path": "src/sidepanel/index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "ContractLens — Analyze this document"
+  }
+}
