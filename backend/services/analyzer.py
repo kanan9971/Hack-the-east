@@ -1,5 +1,6 @@
 import json
 import logging
+import httpx
 import anthropic
 
 import config
@@ -33,8 +34,9 @@ Your job is to produce a JSON object with the following fields — nothing else,
 
 Rules:
 - Output ONLY valid JSON, no markdown fences, no explanation outside the JSON.
+- Keep ALL strings concise — summaries under 3 sentences, explanations under 2 sentences, excerpts under 30 words.
 - If the document is not a legal document, still do your best and note it in the summary.
-- For risks, focus on clauses that are unusual, one-sided, or could surprise a typical consumer.
+- For risks, focus on clauses that are unusual, one-sided, or could surprise a typical consumer. Limit to the top 5 most important risks.
 - Severity guide: high = could cause significant financial/legal harm; medium = worth knowing about; low = standard but notable.
 """
 
@@ -59,23 +61,64 @@ def _build_user_prompt(sections: list[Section], doc_type: str | None, persona: s
     return "\n".join(parts)
 
 
-def _parse_llm_json(raw: str) -> dict:
+def _repair_truncated_json(text: str) -> str:
+    """Best-effort repair of JSON truncated by max_tokens."""
+    in_string = False
+    escape = False
+    stack: list[str] = []
+
+    for ch in text:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            if in_string:
+                escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in ("{", "["):
+            stack.append(ch)
+        elif ch == "}" and stack and stack[-1] == "{":
+            stack.pop()
+        elif ch == "]" and stack and stack[-1] == "[":
+            stack.pop()
+
+    if in_string:
+        text += '"'
+
+    while stack:
+        opener = stack.pop()
+        text += "]" if opener == "[" else "}"
+
+    return text
+
+
+def _parse_llm_json(raw: str, truncated: bool = False) -> dict:
     text = raw.strip()
     if text.startswith("```"):
         lines = text.splitlines()
         lines = [l for l in lines if not l.strip().startswith("```")]
         text = "\n".join(lines)
 
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start != -1 and end > start:
+    start = text.find("{")
+    if start != -1:
+        text = text[start:]
+
+    for attempt_text in [text, _repair_truncated_json(text)] if truncated else [text]:
+        end = attempt_text.rfind("}") + 1
+        if end > 0:
             try:
-                return json.loads(text[start:end])
+                return json.loads(attempt_text[:end])
             except json.JSONDecodeError:
                 pass
+        try:
+            return json.loads(attempt_text)
+        except json.JSONDecodeError:
+            pass
 
     logger.error("Failed to parse LLM response as JSON: %s", text[:500])
     return {
@@ -130,14 +173,15 @@ async def analyze_contract(
         return _generate_fallback(sections, doc_type, persona)
 
     try:
-        client = anthropic.Anthropic(
+        client = anthropic.AsyncAnthropic(
             api_key=config.MINIMAX_API_KEY,
             base_url=config.MINIMAX_BASE_URL,
+            timeout=httpx.Timeout(120.0, connect=10.0),
         )
 
         user_prompt = _build_user_prompt(sections, doc_type, persona)
 
-        message = client.messages.create(
+        message = await client.messages.create(
             model=config.MINIMAX_MODEL,
             max_tokens=config.MAX_TOKENS,
             system=SYSTEM_PROMPT,
@@ -149,8 +193,19 @@ async def analyze_contract(
             if hasattr(block, "text"):
                 raw_text += block.text
 
-        return _parse_llm_json(raw_text)
+        truncated = getattr(message, "stop_reason", None) == "max_tokens"
+        if truncated:
+            logger.warning("LLM response was truncated (hit max_tokens), attempting repair.")
 
+        logger.info("MiniMax API call succeeded, response length: %d", len(raw_text))
+        return _parse_llm_json(raw_text, truncated=truncated)
+
+    except anthropic.APIStatusError as e:
+        logger.error("MiniMax API error (status %s): %s", e.status_code, e.message)
+        return _generate_fallback(sections, doc_type, persona)
+    except httpx.TimeoutException:
+        logger.error("MiniMax API call timed out — falling back to heuristic analysis.")
+        return _generate_fallback(sections, doc_type, persona)
     except Exception as e:
         logger.error("MiniMax API call failed: %s — falling back to heuristic analysis.", e)
         return _generate_fallback(sections, doc_type, persona)
