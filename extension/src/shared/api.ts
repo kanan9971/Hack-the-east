@@ -4,6 +4,8 @@ import type {
   InsightsRequest,
   InsightsResponse,
   VaultReceipt,
+  AgentChatRequest,
+  AgentChatResponse,
 } from "./types";
 
 const API_BASE = "http://localhost:8000";
@@ -54,6 +56,23 @@ export async function vaultAnalysis(
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(`Vault error ${res.status}: ${detail}`);
+  }
+
+  return res.json();
+}
+
+export async function agentChat(
+  req: AgentChatRequest
+): Promise<AgentChatResponse> {
+  const res = await fetch(`${API_BASE}/agent/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Agent error ${res.status}: ${detail}`);
   }
 
   return res.json();

@@ -67,6 +67,24 @@ export interface VaultReceipt {
   message: string;
 }
 
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+}
+
+export interface AgentChatRequest {
+  session_id?: string;
+  message: string;
+  page_text?: string;
+}
+
+export interface AgentChatResponse {
+  session_id: string;
+  reply: string;
+  error?: string;
+}
+
 export type MessageType =
   | { type: "ANALYZE_PAGE" }
   | { type: "ANALYZE_TEXT"; text: string; doc_type?: string; persona?: string }

@@ -65,3 +65,15 @@ class VaultReceipt(BaseModel):
     status: str
     expires: str | None = None
     message: str
+
+
+class AgentChatRequest(BaseModel):
+    session_id: str | None = None
+    message: str
+    page_text: str | None = None
+
+
+class AgentChatResponse(BaseModel):
+    session_id: str
+    reply: str
+    error: str | None = None

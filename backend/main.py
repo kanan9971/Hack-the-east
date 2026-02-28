@@ -3,13 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 import config
-from schemas import AnalyzeRequest, AnalyzeResponse, VaultRequest, VaultReceipt, InsightsRequest, InsightsResponse
+from schemas import (
+    AnalyzeRequest, AnalyzeResponse, VaultRequest, VaultReceipt,
+    InsightsRequest, InsightsResponse, AgentChatRequest, AgentChatResponse,
+)
 from services.parser import parse_text
 from services.classifier import classify_sections
 from services.analyzer import analyze_contract
 from services.insights import generate_insights
 from services.risk_flagger import flag_risks
 from services.vault import create_vault_receipt
+from services.agent import agent_chat
 
 app = FastAPI(title="ContractLens API", version="1.0.0")
 
@@ -60,6 +64,14 @@ async def vault_analysis(req: VaultRequest):
         raise HTTPException(status_code=400, detail="No analysis data provided.")
     receipt = create_vault_receipt(req.analysis)
     return VaultReceipt(**receipt)
+
+
+@app.post("/agent/chat", response_model=AgentChatResponse)
+async def chat_with_agent(req: AgentChatRequest):
+    if not req.message or not req.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+    result = await agent_chat(req.session_id, req.message, req.page_text)
+    return AgentChatResponse(**result)
 
 
 handler = Mangum(app)
