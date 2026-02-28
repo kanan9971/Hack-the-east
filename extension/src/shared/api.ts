@@ -2,6 +2,8 @@ import type { AnalyzeRequest, AnalyzeResponse, VaultReceipt } from "./types";
 
 const API_BASE = "http://localhost:8000";
 
+export const DASHBOARD_URL = `${API_BASE}/dashboard`;
+
 export async function analyzeDocument(
   req: AnalyzeRequest
 ): Promise<AnalyzeResponse> {

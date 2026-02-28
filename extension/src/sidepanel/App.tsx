@@ -5,6 +5,7 @@ import RisksTab from "./components/RisksTab";
 import DetailsTab from "./components/DetailsTab";
 import ForYouTab from "./components/ForYouTab";
 import VaultTab from "./components/VaultTab";
+import { DASHBOARD_URL } from "../shared/api";
 
 type Tab = "summary" | "risks" | "details" | "foryou" | "vault";
 
@@ -87,6 +88,10 @@ export default function App() {
     });
   };
 
+  const handleOpenDashboard = () => {
+    chrome.tabs.create({ url: DASHBOARD_URL });
+  };
+
   const handleReanalyzeFromPage = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
@@ -114,7 +119,17 @@ export default function App() {
             </div>
             <h1 className="text-base font-semibold text-gray-900">ContractLens</h1>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 items-center">
+            <button
+              onClick={handleOpenDashboard}
+              title="Open web dashboard"
+              className="px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 text-xs font-medium flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Dashboard
+            </button>
             <button
               onClick={handleReanalyzeFromPage}
               title="Re-analyze page"
