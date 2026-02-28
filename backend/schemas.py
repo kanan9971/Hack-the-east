@@ -51,3 +51,17 @@ class InsightsRequest(BaseModel):
 
 class InsightsResponse(BaseModel):
     insights: ForYouInsights
+class VaultRequest(BaseModel):
+    analysis: dict
+
+
+class VaultReceipt(BaseModel):
+    vault_id: str
+    content_hash: str
+    timestamp: str
+    vault_address: str
+    network: str
+    algorithm: str
+    status: str
+    expires: str | None = None
+    message: str

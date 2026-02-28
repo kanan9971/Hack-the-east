@@ -1,6 +1,8 @@
 import { generateInsights as fetchInsights } from "../shared/api";
 
 const API_BASE = "http://localhost:8000";
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 800;
 
 interface AnalysisState {
   status: "idle" | "loading" | "done" | "error";
@@ -15,9 +17,27 @@ function broadcastState() {
   chrome.runtime.sendMessage({
     type: "STATE_UPDATE",
     state: currentState,
-  }).catch(() => {
-    // Side panel may not be open yet
-  });
+  }).catch(() => {});
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendMessageWithRetry(
+  tabId: number,
+  message: { type: string },
+  retries = MAX_RETRIES
+): Promise<{ text?: string; doc_type?: string } | null> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, message);
+      if (response) return response;
+    } catch {
+      if (i < retries - 1) await sleep(RETRY_DELAY_MS);
+    }
+  }
+  return null;
 }
 
 async function runAnalysis(text: string, doc_type?: string, persona?: string) {
@@ -53,24 +73,14 @@ chrome.action.onClicked.addListener(async (tab) => {
 
   await chrome.sidePanel.open({ tabId: tab.id });
 
-  try {
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      type: "ANALYZE_PAGE",
-    });
+  const response = await sendMessageWithRetry(tab.id, { type: "ANALYZE_PAGE" });
 
-    if (response?.text && response.text.length > 50) {
-      runAnalysis(response.text, response.doc_type);
-    } else {
-      currentState = {
-        status: "error",
-        error: "Could not extract enough text from this page. Try pasting text manually.",
-      };
-      broadcastState();
-    }
-  } catch {
+  if (response?.text && response.text.length > 50) {
+    runAnalysis(response.text, response.doc_type);
+  } else {
     currentState = {
       status: "error",
-      error: "Could not connect to the page. Refresh and try again.",
+      error: "Could not extract enough text from this page. Try pasting text manually.",
     };
     broadcastState();
   }
@@ -117,7 +127,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "LEGAL_PAGE_DETECTED") {
-    // Could auto-open side panel or show a badge in the future
     chrome.action.setBadgeText({ text: "!" });
     chrome.action.setBadgeBackgroundColor({ color: "#3B82F6" });
     return false;
