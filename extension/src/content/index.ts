@@ -13,26 +13,50 @@ const LEGAL_URL_PATTERNS = [
   /\/disclaimer/i,
 ];
 
+const MAX_TEXT_LENGTH = 15_000;
+
+const JUNK_SELECTORS = [
+  "nav", "header", "footer",
+  ".nav", ".header", ".footer", ".sidebar", ".menu",
+  ".cookie-banner", ".ad", ".ads", ".advert",
+  "[role='navigation']", "[role='banner']", "[role='complementary']",
+  "#comments", ".comments", ".comment-section",
+  "#chat", ".chat", ".live-chat",
+  ".feed", ".recommendations", ".related",
+  ".video-player", "video", "ytd-watch-flexy #secondary",
+  "ytd-comments", "#related", "#guide",
+  ".share-bar", ".social-share", ".reactions",
+].join(", ");
+
 function isLegalPage(): boolean {
   const url = window.location.href.toLowerCase();
   return LEGAL_URL_PATTERNS.some((p) => p.test(url));
 }
 
 function extractPageText(): string {
-  const body = document.body;
-  if (!body) return "";
+  const mainContent =
+    document.querySelector("main") ||
+    document.querySelector("article") ||
+    document.querySelector("[role='main']") ||
+    document.querySelector("#content") ||
+    document.querySelector(".content");
 
-  const selectors =
-    "nav, header, footer, .nav, .header, .footer, .sidebar, .menu, .cookie-banner, .ad, [role='navigation'], [role='banner']";
-  const clone = body.cloneNode(true) as HTMLElement;
+  const root = mainContent || document.body;
+  if (!root) return "";
 
-  clone.querySelectorAll(selectors).forEach((el) => el.remove());
-  clone.querySelectorAll("script, style, noscript, iframe").forEach((el) =>
+  const clone = root.cloneNode(true) as HTMLElement;
+
+  clone.querySelectorAll(JUNK_SELECTORS).forEach((el) => el.remove());
+  clone.querySelectorAll("script, style, noscript, iframe, svg, canvas, img").forEach((el) =>
     el.remove()
   );
 
   let text = clone.innerText || clone.textContent || "";
-  text = text.replace(/\n{3,}/g, "\n\n").trim();
+  text = text.replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ").trim();
+
+  if (text.length > MAX_TEXT_LENGTH) {
+    text = text.slice(0, MAX_TEXT_LENGTH);
+  }
 
   return text;
 }
