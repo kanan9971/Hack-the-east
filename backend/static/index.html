@@ -388,30 +388,56 @@
       .label-confidentiality { background: #cffafe; color: #0891b2; }
 
       /* For You */
-      .persona-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-      .persona-btn {
+      .fy-section { margin-bottom: 16px; }
+      .persona-btns, .concern-btns, .context-btns, .experience-btns, .db-btns {
+        display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+      }
+      .persona-btn, .concern-btn, .context-btn, .experience-btn, .db-btn {
         padding: 8px 16px;
         font-size: 14px;
         font-weight: 500;
         border-radius: 999px;
-        border: none;
+        border: 1px solid transparent;
         background: #f3f4f6;
         color: #374151;
         cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
       }
-      .persona-btn:hover { background: #e5e7eb; }
+      .persona-btn:hover, .concern-btn:hover, .context-btn:hover,
+      .experience-btn:hover, .db-btn:hover { background: #e5e7eb; }
       .persona-btn.active { background: #3b82f6; color: #fff; }
-      .persona-notes { list-style: none; padding: 0; margin: 0; }
-      .persona-notes li {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 12px;
-        font-size: 14px;
-        color: #374151;
-        line-height: 1.5;
+      .concern-btn.active { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+      .context-btn.active { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+      .experience-btn.active { background: #1f2937; color: #fff; }
+      .db-btn.active { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+      .db-input-row { display: flex; gap: 8px; margin-top: 4px; }
+      .db-input-row input {
+        flex: 1; padding: 8px 12px; font-size: 13px;
+        border: 1px solid #e5e7eb; border-radius: 8px;
       }
-      .persona-notes .icon { color: #3b82f6; flex-shrink: 0; margin-top: 2px; }
+      .db-input-row input:focus { outline: none; border-color: #3b82f6; }
+      .db-input-row button {
+        padding: 8px 12px; font-size: 13px; font-weight: 500;
+        color: #2563eb; background: none; border: none; cursor: pointer; border-radius: 8px;
+      }
+      .db-input-row button:hover { background: #eff6ff; }
+      .fy-get-btn {
+        width: 100%; padding: 14px 20px; font-size: 15px; font-weight: 600;
+        background: #3b82f6; color: #fff; border: none; border-radius: 10px;
+        cursor: pointer; box-shadow: 0 2px 4px rgba(59,130,246,0.25);
+      }
+      .fy-get-btn:hover { background: #2563eb; }
+      .fy-get-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+      .fy-error { padding: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; font-size: 14px; color: #b91c1c; margin-bottom: 16px; }
+      .fy-insights-list { list-style: none; padding: 0; margin: 0; }
+      .fy-insights-list li {
+        display: flex; align-items: flex-start; gap: 12px;
+        margin-bottom: 10px; font-size: 14px; color: #374151; line-height: 1.5;
+      }
+      .fy-insights-list .icon { flex-shrink: 0; margin-top: 2px; }
+      .fy-insights-list .icon.warn { color: #f59e0b; }
+      .fy-insights-list .icon.action { color: #3b82f6; }
+      .fy-insights-list .icon.info { color: #9ca3af; }
       .for-you-empty { text-align: center; padding: 32px 16px; color: #9ca3af; font-size: 14px; }
 
       /* Vault */
@@ -667,23 +693,132 @@
         });
       }
 
+      const fyCtx = { persona: null, primary_concerns: [], document_context: null, experience_level: null, deal_breakers: [] };
+      let fyInsights = null;
+      let fyLoading = false;
+      let fyError = '';
+
+      const PERSONAS = [{ id: 'student', label: 'Student' }, { id: 'employee', label: 'Employee' }, { id: 'freelancer', label: 'Freelancer' }, { id: 'tenant', label: 'Tenant' }];
+      const PRIMARY_CONCERNS = [
+        { id: 'privacy', label: 'Privacy' }, { id: 'cost_fees', label: 'Cost / Fees' },
+        { id: 'termination', label: 'Termination' }, { id: 'ip_ownership', label: 'IP ownership' },
+        { id: 'liability', label: 'Liability' }, { id: 'data_sharing', label: 'Data sharing' },
+        { id: 'auto_renew', label: 'Auto-renewal' }, { id: 'non_compete', label: 'Non-compete' },
+      ];
+      const DOC_CONTEXTS = [
+        { id: 'new_job', label: 'New job' }, { id: 'housing_lease', label: 'Housing lease' },
+        { id: 'freelance_gig', label: 'Freelance gig' }, { id: 'app_signup', label: 'App signup' },
+        { id: 'service_agreement', label: 'Service agreement' }, { id: 'other', label: 'Other' },
+      ];
+      const EXP_LEVELS = [{ id: 'first_contract', label: 'First contract' }, { id: 'experienced', label: "I've signed many" }];
+      const DB_OPTIONS = ['non-compete', 'unlimited liability', 'mandatory arbitration', 'data selling', 'ip_assignment', 'auto-renewal'];
+
+      function toggleArr(arr, item) { return arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item]; }
+
       function renderForYou() {
-        const d = state.data;
         const root = document.getElementById('tab-foryou');
-        const PERSONAS = [{ id: 'student', label: 'Student' }, { id: 'employee', label: 'Employee' }, { id: 'freelancer', label: 'Freelancer' }, { id: 'tenant', label: 'Tenant' }];
-        let html = '<div class="card"><div class="card-title mb3">I am a...</div><div class="persona-btns">';
-        PERSONAS.forEach(p => { html += '<button type="button" class="persona-btn" data-persona="' + p.id + '">' + p.label + '</button>'; });
-        html += '</div></div>';
-        if (d.persona_notes && d.persona_notes.length) {
-          html += '<div class="card"><div class="card-title mb3">What this means for you</div><ul class="persona-notes">';
-          d.persona_notes.forEach(n => {
-            html += '<li><svg class="icon" width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg><span>' + escapeHtml(n) + '</span></li>';
-          });
-          html += '</ul></div>';
+        let h = '';
+
+        h += '<div class="card fy-section"><div class="card-title mb3">I am a...</div><div class="persona-btns">';
+        PERSONAS.forEach(p => { h += '<button type="button" class="persona-btn' + (fyCtx.persona === p.id ? ' active' : '') + '" data-fy-persona="' + p.id + '">' + p.label + '</button>'; });
+        h += '</div></div>';
+
+        h += '<div class="card fy-section"><div class="card-title mb3">What matters most to you</div><div class="concern-btns">';
+        PRIMARY_CONCERNS.forEach(c => { h += '<button type="button" class="concern-btn' + (fyCtx.primary_concerns.includes(c.id) ? ' active' : '') + '" data-fy-concern="' + c.id + '">' + c.label + '</button>'; });
+        h += '</div></div>';
+
+        h += '<div class="card fy-section"><div class="card-title mb3">Why are you signing this?</div><div class="context-btns">';
+        DOC_CONTEXTS.forEach(d => { h += '<button type="button" class="context-btn' + (fyCtx.document_context === d.id ? ' active' : '') + '" data-fy-context="' + d.id + '">' + d.label + '</button>'; });
+        h += '</div></div>';
+
+        h += '<div class="card fy-section"><div class="card-title mb3">Experience level</div><div class="experience-btns">';
+        EXP_LEVELS.forEach(e => { h += '<button type="button" class="experience-btn' + (fyCtx.experience_level === e.id ? ' active' : '') + '" data-fy-exp="' + e.id + '">' + e.label + '</button>'; });
+        h += '</div></div>';
+
+        h += '<div class="card fy-section"><div class="card-title mb3">Deal-breakers to check</div><div class="db-btns">';
+        DB_OPTIONS.forEach(db => { h += '<button type="button" class="db-btn' + (fyCtx.deal_breakers.includes(db) ? ' active' : '') + '" data-fy-db="' + db + '">' + db.replace(/_/g, ' ') + '</button>'; });
+        fyCtx.deal_breakers.filter(d => !DB_OPTIONS.includes(d)).forEach(db => {
+          h += '<button type="button" class="db-btn active" data-fy-db="' + escapeHtml(db) + '">' + escapeHtml(db) + '</button>';
+        });
+        h += '</div><div class="db-input-row"><input type="text" id="fy-custom-db" placeholder="Add custom..." /><button type="button" id="fy-add-db">Add</button></div></div>';
+
+        if (fyLoading) {
+          h += '<button type="button" class="fy-get-btn" disabled><div class="spinner" style="display:inline-block;border-color:#fff;border-top-color:transparent;width:14px;height:14px;vertical-align:-2px;margin-right:8px"></div>Generating insights...</button>';
         } else {
-          html += '<div class="for-you-empty">Select a persona above to get tailored insights.</div>';
+          h += '<button type="button" class="fy-get-btn" id="fy-generate-btn">Get personalized insights</button>';
         }
-        root.innerHTML = html;
+
+        if (fyError) h += '<div class="fy-error">' + escapeHtml(fyError) + '</div>';
+
+        if (fyInsights && !fyLoading) {
+          h += '<div class="card"><div class="card-title mb3">For you</div><p style="font-size:14px;color:#374151;line-height:1.5">' + escapeHtml(fyInsights.tailored_summary) + '</p></div>';
+
+          if (fyInsights.top_risks_for_you && fyInsights.top_risks_for_you.length) {
+            h += '<div class="card"><div class="card-title mb3">Top risks for you</div><ul class="fy-insights-list">';
+            fyInsights.top_risks_for_you.forEach(r => {
+              h += '<li><svg class="icon warn" width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg><span>' + escapeHtml(r) + '</span></li>';
+            });
+            h += '</ul></div>';
+          }
+          if (fyInsights.action_items && fyInsights.action_items.length) {
+            h += '<div class="card"><div class="card-title mb3">Action items</div><ul class="fy-insights-list">';
+            fyInsights.action_items.forEach(a => {
+              h += '<li><svg class="icon action" width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg><span>' + escapeHtml(a) + '</span></li>';
+            });
+            h += '</ul></div>';
+          }
+          if (fyInsights.deal_breaker_checks && fyInsights.deal_breaker_checks.length) {
+            h += '<div class="card"><div class="card-title mb3">Deal-breaker check</div><ul class="fy-insights-list">';
+            fyInsights.deal_breaker_checks.forEach(c => {
+              h += '<li><svg class="icon info" width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg><span>' + escapeHtml(c) + '</span></li>';
+            });
+            h += '</ul></div>';
+          }
+        }
+
+        if (!fyInsights && !fyLoading && !fyError) {
+          h += '<div class="for-you-empty">Fill in your context above and click &ldquo;Get personalized insights&rdquo; to see tailored analysis.</div>';
+        }
+
+        root.innerHTML = h;
+
+        root.querySelectorAll('[data-fy-persona]').forEach(b => b.addEventListener('click', () => { fyCtx.persona = b.dataset.fyPersona; renderForYou(); }));
+        root.querySelectorAll('[data-fy-concern]').forEach(b => b.addEventListener('click', () => { fyCtx.primary_concerns = toggleArr(fyCtx.primary_concerns, b.dataset.fyConcern); renderForYou(); }));
+        root.querySelectorAll('[data-fy-context]').forEach(b => b.addEventListener('click', () => { fyCtx.document_context = b.dataset.fyContext; renderForYou(); }));
+        root.querySelectorAll('[data-fy-exp]').forEach(b => b.addEventListener('click', () => { fyCtx.experience_level = b.dataset.fyExp; renderForYou(); }));
+        root.querySelectorAll('[data-fy-db]').forEach(b => b.addEventListener('click', () => { fyCtx.deal_breakers = toggleArr(fyCtx.deal_breakers, b.dataset.fyDb); renderForYou(); }));
+
+        const addDbBtn = root.querySelector('#fy-add-db');
+        const dbInput = root.querySelector('#fy-custom-db');
+        if (addDbBtn && dbInput) {
+          const addCustom = () => {
+            const v = dbInput.value.trim().toLowerCase();
+            if (v && !fyCtx.deal_breakers.includes(v)) { fyCtx.deal_breakers.push(v); renderForYou(); }
+          };
+          addDbBtn.addEventListener('click', addCustom);
+          dbInput.addEventListener('keydown', e => { if (e.key === 'Enter') addCustom(); });
+        }
+
+        const genBtn = root.querySelector('#fy-generate-btn');
+        if (genBtn) genBtn.addEventListener('click', handleGetInsights);
+      }
+
+      async function handleGetInsights() {
+        fyLoading = true; fyError = ''; fyInsights = null;
+        renderForYou();
+        try {
+          const res = await fetch(API_BASE + '/insights', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ analysis: state.data, user_context: fyCtx })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || res.status));
+          fyInsights = data.insights;
+        } catch (e) {
+          fyError = e.message || 'Failed to generate insights';
+        }
+        fyLoading = false;
+        renderForYou();
       }
 
       function renderVault() {
