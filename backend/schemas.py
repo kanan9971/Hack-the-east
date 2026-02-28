@@ -27,3 +27,27 @@ class AnalyzeResponse(BaseModel):
     sections: list[SectionOut]
     entities: dict
     persona_notes: list[str] | None = None
+
+
+class UserContext(BaseModel):
+    persona: str | None = None
+    primary_concerns: list[str] = []
+    document_context: str | None = None
+    experience_level: str | None = None
+    deal_breakers: list[str] = []
+
+
+class ForYouInsights(BaseModel):
+    top_risks_for_you: list[str]
+    action_items: list[str]
+    deal_breaker_checks: list[str]
+    tailored_summary: str
+
+
+class InsightsRequest(BaseModel):
+    analysis: AnalyzeResponse
+    user_context: UserContext
+
+
+class InsightsResponse(BaseModel):
+    insights: ForYouInsights

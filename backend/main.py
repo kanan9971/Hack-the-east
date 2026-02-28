@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
 import config
-from schemas import AnalyzeRequest, AnalyzeResponse
+from schemas import AnalyzeRequest, AnalyzeResponse, InsightsRequest, InsightsResponse
 from services.parser import parse_text
 from services.classifier import classify_sections
 from services.analyzer import analyze_contract
+from services.insights import generate_insights
 from services.risk_flagger import flag_risks
 
 app = FastAPI(title="ContractLens API", version="1.0.0")
@@ -46,6 +47,12 @@ async def analyze(req: AnalyzeRequest):
         entities=llm_result.get("entities", {}),
         persona_notes=llm_result.get("persona_notes"),
     )
+
+
+@app.post("/insights", response_model=InsightsResponse)
+async def get_insights(req: InsightsRequest):
+    insights = await generate_insights(req.analysis, req.user_context)
+    return InsightsResponse(insights=insights)
 
 
 handler = Mangum(app)

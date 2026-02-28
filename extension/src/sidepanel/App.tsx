@@ -77,14 +77,6 @@ export default function App() {
     setPasteText("");
   };
 
-  const handleReanalyze = (persona?: string) => {
-    chrome.runtime.sendMessage({
-      type: "ANALYZE_TEXT",
-      text: data ? "" : pasteText,
-      persona,
-    });
-  };
-
   const handleReanalyzeFromPage = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
@@ -234,7 +226,7 @@ export default function App() {
             {tab === "risks" && <RisksTab data={data} />}
             {tab === "details" && <DetailsTab data={data} />}
             {tab === "foryou" && (
-              <ForYouTab data={data} onReanalyze={handleReanalyze} />
+              <ForYouTab data={data} />
             )}
           </>
         )}
